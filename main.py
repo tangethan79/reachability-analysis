@@ -6,7 +6,17 @@ from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from matplotlib import pyplot as plt
 import random
 from tqdm import tqdm
+import json
 
+def convert_np_to_list(data):
+    if isinstance(data, dict):
+        return {k: convert_np_to_list(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [convert_np_to_list(i) for i in data]
+    elif isinstance(data, np.ndarray):
+        return data.tolist()
+    else:
+        return data
 
 if __name__ == '__main__':
 
@@ -59,6 +69,7 @@ if __name__ == '__main__':
     num_orientations = rpy.shape[0]
     list_heatmaps = []
 
+
     with tqdm(total=xyz.shape[0]* len(targets.points)) as pbar:
         for rcm_pos in np.nditer(xyz, flags=['external_loop'], order='C'):
 
@@ -89,16 +100,31 @@ if __name__ == '__main__':
                 best_RCM = rcm_pos
                 best_targets = ratios
 
-            list_heatmaps.append(ratios)
+            rcm_dict = {'RCM':rcm_pos,'average_ratio':avg,'heatmap':ratios}
+            list_heatmaps.append(rcm_dict)
 
-    targets.plot_mesh(ax,scatter_color=True,colors=ratios)
-    print(ratios)
+    best_dict = {'best_RCM':best_RCM,'best_ratio_average':best_ratio,'best_heatmap':best_targets}
+    list_heatmaps.append(best_dict)
+
+    list_heatmaps_serializable = convert_np_to_list(list_heatmaps)
+
+    # Save to JSON file
+    json_file_path = "list_heatmaps_results.json"
+    with open(json_file_path, "w") as json_file:
+        json.dump(list_heatmaps_serializable, json_file, indent=4)
+
+    print(f"Saved list_heatmaps to {json_file_path}")
+
+    targets.plot_mesh(ax,scatter_color=True,colors=best_targets)
+    print(best_RCM)
 
     plt.show()
 
     """
     rcm_pos = np.array([1,0,2])
     transform[0:3, 3] = rcm_pos.T
+
+    ratios = np.empty(len(targets.points))
     with tqdm(total=len(targets.points)) as pbar:
         for i in range(len(targets.points)):
             target_point = targets.points[i]
@@ -113,7 +139,13 @@ if __name__ == '__main__':
             # check the ratio of collision free orientations for a given target point
             col_free_accum = col_free_accum / num_orientations
             ratios[i] = col_free_accum
-            pbar.update(1)"""
+            pbar.update(1)
 
+
+    targets.plot_mesh(ax,scatter_color=True,colors=ratios)
+    print(ratios)
+
+    plt.show()
+    """
     # now need to call psm.linear_inteprolation(joints), build and prep mesh, and query tree
     # threshold query points based on radius of each region
