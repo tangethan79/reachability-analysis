@@ -192,7 +192,6 @@ class PSM:
         # note that number indicates frame in which coordinates are expressed
         yaw_7 = generate_frame([0,0,-self.L_yaw2ctrlpnt], [0,0,0])
         yaw_0 = np.matmul(end_frame, yaw_7)
-        print(yaw_0[0:3,3],end_frame[0:3,3])
 
         yaw_local = invert_frame(yaw_0)
 
