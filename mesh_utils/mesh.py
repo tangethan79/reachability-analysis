@@ -3,28 +3,26 @@ import numpy as np
 from stl import mesh
 from scipy import spatial
 from scipy.spatial.transform import Rotation as R
+from matplotlib import cm
 import yaml
+import os
 
 #plotting libraries
 from mpl_toolkits import mplot3d
 from matplotlib import pyplot as plt
 
 
-mesh_path = 'mesh_files/'
-adf_path = 'yaml_files/'
-
 class MeshObj:
     def __init__(self, adf_num=None, body_index=None, stl_num=None):
-        yaml_list = ['mouth_cup.yaml', 'scan_aperture.yaml', 'open_oral_cavity.yaml', 'mouth_cup.yaml',
-                     'mouth_cup_v2.yaml']
-        stl_list = ['mouth cup.STL', 'cleft_retracted_june_7.STL', 'Complete_remeshed.STL', 'mouth cup smooth.STL',
-                    'mouth cup v2 no holes.STL']
+        yaml_list = ['reachability_config.yaml']
+        stl_list = ['Complete_remeshed_20_dec.STL', 'target_points.STL']
+
         if adf_num:
             self.adf_str = yaml_list[adf_num]
         else:
             # default stl string, change as needed
             self.adf_str = yaml_list[0]
-        self.adf_str = adf_path + self.adf_str
+        self.adf_str = os.path.join(os.path.dirname(__file__), self.adf_str)
 
         if body_index:
             self.body_ind = body_index
@@ -35,7 +33,7 @@ class MeshObj:
             self.stl_str = stl_list[stl_num]
         else:
             self.stl_str = stl_list[adf_num]
-        self.stl_str = mesh_path + self.stl_str
+        self.stl_str = os.path.join(os.path.dirname(__file__), self.stl_str)
 
         self.get_stl()
         self.load_tree()
@@ -44,15 +42,16 @@ class MeshObj:
         self.tree = spatial.KDTree(self.points)
         return self.tree
 
-    def plot_mesh(self):
-        # plotting test
-        figure = plt.figure()
-        axes = figure.add_subplot(projection='3d')
-        axes.add_collection3d(mplot3d.art3d.Poly3DCollection(self.mesh.vectors))
-        # automatically scale to the mesh size
-        scale = self.mesh.points.flatten()
-        axes.auto_scale_xyz(scale, scale, scale)
-        plt.show()
+    def plot_mesh(self, axes, scatter_color = False, colors = None):
+        if scatter_color:
+            axes.scatter(self.points[:,0],self.points[:,1],self.points[:,2],c=colors, cmap = 'plasma')
+        else:
+            # plotting test
+            if self.body_ind == 1:
+                axes.add_collection3d(mplot3d.art3d.Poly3DCollection(self.mesh.vectors, facecolors='red'))
+            else:
+                axes.add_collection3d(mplot3d.art3d.Poly3DCollection(self.mesh.vectors))
+            # automatically scale to the mesh size
         return
 
     def get_stl(self):
@@ -61,7 +60,7 @@ class MeshObj:
         self.get_pose_homog()
         mouth.transform(self.homog)
         self.mesh = mouth
-        self.points = np.around(np.unique(mouth.vectors.reshape([int(mouth.vectors.size / 3), 3]), axis=0), 2)
+        self.points = np.around(np.unique(mouth.vectors.reshape([int(mouth.vectors.size / 3), 3]), axis=0), 5)
         return self.points
 
     def get_pose_homog(self):

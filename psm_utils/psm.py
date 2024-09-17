@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from scipy.spatial.transform import Rotation
 import math
-
+from mesh_utils.mesh import MeshObj
 
 def generate_frame(position: List[float], rpy: List[float]) -> np.ndarray:
     end_orientation = Rotation.from_euler('XYZ', rpy, degrees=False)
@@ -69,19 +69,20 @@ def get_angle(vec_a, vec_b, up_vector=None):
 
 # THIS WAS GENERATED WITH CHATGPT ASSISTANCE
 class PSM:
-    def __init__(self, origin: np.ndarray):
+    def __init__(self, origin: np.ndarray, col_mesh: MeshObj = None):
         """
         Initialize the PSM with a list of joints and an initial origin (in world coordinates).
 
         :param joints: List of Joint objects that define the manipulator.
         :param origin: Initial 4x4 homogeneous transform of the base in world coordinates.
         """
+        self.col_mesh = col_mesh
 
         # this is in units of metres
-        self.L_rcc = 0.4736 # from RCM to prismatic joint start
-        self.L_tool = 0.361 # from tool roll to tool pitch
-        self.L_pitch2yaw = 0.0038
-        self.L_yaw2ctrlpnt = 0.0025
+        self.L_rcc = 4.736 # from RCM to prismatic joint start
+        self.L_tool = 3.61 # from tool roll to tool pitch
+        self.L_pitch2yaw = 0.038
+        self.L_yaw2ctrlpnt = 0.025
         self.L_tool2rcm_offset = self.L_rcc - self.L_tool
 
 
@@ -90,13 +91,13 @@ class PSM:
 
         # DH parameters (alpha, a, theta, d)
         # setting up the PSM with known parameters, these match the HSC 3mm instruments
-        self.joints.append(Joint('revolute', np.array([np.pi/2, 0, np.pi/2, 0]), 1.5, convention_change=True))
-        self.joints.append(Joint('revolute', np.array([-np.pi/2, 0, -np.pi/2, 0]), 1.5, convention_change=True))
-        self.joints.append(Joint('prismatic', np.array([np.pi/2, 0, 0, -self.L_rcc]), 1.5, convention_change=True))
-        self.joints.append(Joint('revolute', np.array([0, 0, 0, self.L_tool]), 1.5, convention_change=True))
-        self.joints.append(Joint('revolute', np.array([-np.pi/2, 0, -np.pi/2, 0]), 1.5, convention_change=True))
-        self.joints.append(Joint('revolute', np.array([-np.pi/2, self.L_pitch2yaw, -np.pi/2, 0]), 1.5, convention_change=True))
-        self.joints.append(Joint('revolute', np.array([-np.pi/2, 0, np.pi/2, self.L_yaw2ctrlpnt]), 1.5, convention_change=True))
+        self.joints.append(Joint('revolute', np.array([np.pi/2, 0, np.pi/2, 0]), 0.015, convention_change=True))
+        self.joints.append(Joint('revolute', np.array([-np.pi/2, 0, -np.pi/2, 0]), 0.015, convention_change=True))
+        self.joints.append(Joint('prismatic', np.array([np.pi/2, 0, 0, -self.L_rcc]), 0.015, convention_change=True, joint_limits=(0.5, self.L_rcc-0.5)))
+        self.joints.append(Joint('revolute', np.array([0, 0, 0, self.L_tool]), 0.015, convention_change=True))
+        self.joints.append(Joint('revolute', np.array([-np.pi/2, 0, -np.pi/2, 0]), 0.015, convention_change=True, joint_limits=(-np.pi/2, np.pi/2)))
+        self.joints.append(Joint('revolute', np.array([-np.pi/2, self.L_pitch2yaw, -np.pi/2, 0]), 0.015, convention_change=True, joint_limits=(-np.pi/2, np.pi/2)))
+        self.joints.append(Joint('revolute', np.array([-np.pi/2, 0, np.pi/2, self.L_yaw2ctrlpnt]), 0.015, convention_change=True))
 
 
         #self.origin = np.matmul(origin,np.array([[0, 0, -1, 0],[0, 1, 0, 0],[1, 0, 0, 0],[0, 0, 0,1]]))  # Initial homogeneous transform matrix of the base (world coordinates)
@@ -107,6 +108,27 @@ class PSM:
         self.int_distance = []
         for i in range(len(self.joints)):
             self.int_distance.append(self.find_int_distance(i))
+
+    def col_check(self, joint_inputs) -> bool:
+        for i in range(len(self.joints)):
+            if self.joints[i].joint_limits is not None:
+                # check that each joint remains in the correct range if one is specified
+                if not (self.joints[i].joint_limits[0] < joint_inputs[i] < self.joints[i].joint_limits[1]):
+                    # print(joint_inputs[i],self.joints[i].joint_limits)
+                    # print('bad_joint')
+                    return False
+
+        query_points = self.linear_interpolation(joint_inputs)
+        for i in range(len(self.joints)):
+            segment = query_points[i]
+            if segment is not None:
+                col_rad = self.joints[i].radius
+                distances, _ = self.col_mesh.query_tree(segment)
+                min_distance = np.min(distances)
+                if min_distance <= col_rad:
+                    # print(min_distance)
+                    return False
+        return True
 
     def visualize_robot(self, ax, joint_inputs = None) -> None:
         if joint_inputs is not None:
@@ -145,7 +167,7 @@ class PSM:
         roots = roots.tolist()
 
         distance = next((x for x in roots if 0 <= x <= 2*r), None)
-
+        #print(distance)
         return distance
 
 
@@ -192,7 +214,7 @@ class PSM:
         # note that number indicates frame in which coordinates are expressed
         yaw_7 = generate_frame([0,0,-self.L_yaw2ctrlpnt], [0,0,0])
         yaw_0 = np.matmul(end_frame, yaw_7)
-        print(yaw_0[0:3,3],end_frame[0:3,3])
+        #print(yaw_0[0:3,3],end_frame[0:3,3])
 
         yaw_local = invert_frame(yaw_0)
 
@@ -246,9 +268,14 @@ class PSM:
 
             # Determine the number of interpolation points based on self.int_distance
             desired_distance = self.int_distance[i]
-            if desired_distance is not None:
+
+            # I just realized that the frame goes back to the prismatic joint and then forwards again
+            # added in the i>3 thing so that we don't double up collision checks
+            if desired_distance is not None and distance_between_joints > 0.01 and i > 2:
                 num_interpolations = max(1, int(distance_between_joints / desired_distance))
                 interpolation_points = np.linspace(start_pos, end_pos, num_interpolations + 1)
                 points.append(interpolation_points)
-
+                # print(interpolation_points.shape)
+            else:
+                points.append(None)
         return points

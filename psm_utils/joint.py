@@ -4,7 +4,8 @@ from typing import Literal
 
 # THIS WAS GENERATED WITH CHATGPT ASSISTANCE
 class Joint:
-    def __init__(self, joint_type: Literal['revolute', 'prismatic'], DH: np.ndarray, radius: float, convention_change: bool = False):
+    def __init__(self, joint_type: Literal['revolute', 'prismatic'], DH: np.ndarray, radius: float, convention_change: bool = False, joint_limits: tuple[float, float] = None):
+        self.joint_limits = joint_limits
         self.convention_change = True
         self.type = joint_type  # type is either 'revolute' or 'prismatic'
         self.DH = DH            # DH parameters (alpha, a, theta, d)

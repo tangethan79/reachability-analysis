@@ -4,19 +4,13 @@ from mesh_utils.mesh import MeshObj
 from psm_utils.psm import PSM
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from matplotlib import pyplot as plt
+import random
+from tqdm import tqdm
 
 
 if __name__ == '__main__':
 
-    # set robot in 3d space
-    orientation = Rotation.from_euler('XYZ', [0, 0, 0])
-    translation = np.array([0, 0, 0.5]).reshape(3,1)
-    transform = np.hstack((orientation.as_matrix(), translation))
-    bottom = np.array([0, 0, 0, 1])
-    transform = np.vstack((transform, bottom))
-    psm = PSM(transform)
-    #visualize_robot(psm)
-
+    # figure setup
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
@@ -24,18 +18,102 @@ if __name__ == '__main__':
     ax.set_ylabel('$Y$', fontsize=20)
     ax.set_zlabel('$Z$', fontsize=20)
 
-    ax.axes.set_xlim3d(left=-0.2, right=0.2)
-    ax.axes.set_ylim3d(bottom=-0.2, top=0.2)
-    ax.axes.set_zlim3d(bottom=0.4, top=0.7)
-
-    joints = psm.inverse_kinematics([0.05, 0.05, 0.45],[0,0,0],global_frame=True)
-    print(joints)
-
-    psm.visualize_robot(ax, joint_inputs=joints)
-
-    joints = psm.inverse_kinematics([0.05, 0.05, 0.45], [np.pi, 0, 0], global_frame=True)
-    print(joints)
-    psm.visualize_robot(ax, joint_inputs=joints)
+    ax.axes.set_xlim3d(left=-1, right=1)
+    ax.axes.set_ylim3d(bottom=-1, top=1)
+    ax.axes.set_zlim3d(bottom=0, top=2)
 
     ax.set_aspect('equal', adjustable='box')
+
+    cleft = MeshObj(adf_num=0, stl_num=0, body_index=0)
+    #print(cleft.points)
+    #cleft.plot_mesh(ax)
+    targets = MeshObj(adf_num=0, stl_num=1, body_index=1)
+    #print(targets.points)
+    #targets.plot_mesh(ax)
+
+    # set robot in 3d space
+    orientation = Rotation.from_euler('XYZ', [0, 0, 0])
+    translation = np.array([0.5, -0.5, 1.5]).reshape(3,1)
+    transform = np.hstack((orientation.as_matrix(), translation))
+    bottom = np.array([0, 0, 0, 1])
+    transform = np.vstack((transform, bottom))
+    psm = PSM(transform, col_mesh=cleft)
+
+    # set up range of angles to iterate through
+    angles = np.arange(0, 360, 72)
+    r, p, y = np.meshgrid(angles, angles, angles, indexing='ij')  # Creates a grid
+    rpy = np.vstack([r.ravel(), p.ravel(), y.ravel()]).T  # Flatten and combine into row vectors
+    rpy = np.deg2rad(rpy)
+
+    # set up list of RCM positions to iterate through
+    xrange = np.arange(0.9,1.2,0.05)
+    yrange = np.arange(-0.3,-0.1,0.05)
+    zrange = np.arange(1.5,3,0.25)
+    x,y,z = np.meshgrid(xrange,yrange,zrange, indexing='ij')
+    xyz = np.vstack([x.ravel(), y.ravel(), z.ravel()]).T
+
+    best_ratio = 0
+    best_RCM = None
+    best_targets = None
+
+    num_orientations = rpy.shape[0]
+    list_heatmaps = []
+
+    with tqdm(total=xyz.shape[0]* len(targets.points)) as pbar:
+        for rcm_pos in np.nditer(xyz, flags=['external_loop'], order='C'):
+
+            ratios = np.empty(len(targets.points))
+            avg = 0
+            transform[0:3, 3] = rcm_pos.T
+            for i in range(len(targets.points)):
+                target_point = targets.points[i]
+                col_free_accum = 0
+                for orientation in np.nditer(rpy, flags=['external_loop'], order='C'):
+                    psm.origin = transform
+                    joints = psm.inverse_kinematics(target_point, rpy=orientation, global_frame=True)
+                    if psm.col_check(joints):
+                        col_free_accum +=1
+                    #print(joints)
+                    #psm.visualize_robot(ax, joint_inputs=joints)
+                # check the ratio of collision free orientations for a given target point
+                col_free_accum = col_free_accum/num_orientations
+                ratios[i] = col_free_accum
+                # add this ratio to the total
+                avg += col_free_accum
+
+            pbar.update(1)
+            # average the collision free ratio across all target points
+            avg = avg/len(targets.points)
+            if avg > best_ratio:
+                best_ratio = avg
+                best_RCM = rcm_pos
+                best_targets = ratios
+
+            list_heatmaps.append(ratios)
+
+    targets.plot_mesh(ax,scatter_color=True,colors=ratios)
+    print(ratios)
+
     plt.show()
+
+    """
+    rcm_pos = np.array([1,0,2])
+    transform[0:3, 3] = rcm_pos.T
+    with tqdm(total=len(targets.points)) as pbar:
+        for i in range(len(targets.points)):
+            target_point = targets.points[i]
+            col_free_accum = 0
+            for orientation in np.nditer(rpy, flags=['external_loop'], order='C'):
+                psm.origin = transform
+                joints = psm.inverse_kinematics(target_point, rpy=orientation, global_frame=True)
+                if psm.col_check(joints):
+                    col_free_accum += 1
+                # print(joints)
+                # psm.visualize_robot(ax, joint_inputs=joints)
+            # check the ratio of collision free orientations for a given target point
+            col_free_accum = col_free_accum / num_orientations
+            ratios[i] = col_free_accum
+            pbar.update(1)"""
+
+    # now need to call psm.linear_inteprolation(joints), build and prep mesh, and query tree
+    # threshold query points based on radius of each region
