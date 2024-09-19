@@ -56,11 +56,14 @@ if __name__ == '__main__':
     rpy = np.deg2rad(rpy)
 
     # set up list of RCM positions to iterate through
-    xrange = np.arange(0.9,1.2,0.05)
-    yrange = np.arange(-0.3,-0.1,0.05)
-    zrange = np.arange(1.5,3,0.25)
-    x,y,z = np.meshgrid(xrange,yrange,zrange, indexing='ij')
-    xyz = np.vstack([x.ravel(), y.ravel(), z.ravel()]).T
+    #xrange = np.arange(0.9,1.1,0.05)
+    #yrange = np.arange(-0.25,-0.1,0.05)
+    #zrange = np.arange(2,4,0.5)
+    #x,y,z = np.meshgrid(xrange,yrange,zrange, indexing='ij')
+    #xyz = np.vstack([x.ravel(), y.ravel(), z.ravel()]).T
+    RCM_targets = MeshObj(adf_num=0, stl_num=2, body_index=2)
+    xyz = RCM_targets.points
+
 
     best_ratio = 0
     best_RCM = None
@@ -70,8 +73,8 @@ if __name__ == '__main__':
     list_heatmaps = []
 
 
-    with tqdm(total=xyz.shape[0]* len(targets.points)) as pbar:
-        for rcm_pos in np.nditer(xyz, flags=['external_loop'], order='C'):
+    with tqdm(total=xyz.shape[1]* len(targets.points)) as pbar:
+        for rcm_pos in xyz:
 
             ratios = np.empty(len(targets.points))
             avg = 0
@@ -83,7 +86,7 @@ if __name__ == '__main__':
                     psm.origin = transform
                     joints = psm.inverse_kinematics(target_point, rpy=orientation, global_frame=True)
                     if psm.col_check(joints):
-                        col_free_accum +=1
+                        col_free_accum += 1
                     #print(joints)
                     #psm.visualize_robot(ax, joint_inputs=joints)
                 # check the ratio of collision free orientations for a given target point
@@ -92,7 +95,7 @@ if __name__ == '__main__':
                 # add this ratio to the total
                 avg += col_free_accum
 
-            pbar.update(1)
+                pbar.update(1)
             # average the collision free ratio across all target points
             avg = avg/len(targets.points)
             if avg > best_ratio:
@@ -109,7 +112,7 @@ if __name__ == '__main__':
     list_heatmaps_serializable = convert_np_to_list(list_heatmaps)
 
     # Save to JSON file
-    json_file_path = "list_heatmaps_results.json"
+    json_file_path = "list_heatmaps_results_sept19.json"
     with open(json_file_path, "w") as json_file:
         json.dump(list_heatmaps_serializable, json_file, indent=4)
 

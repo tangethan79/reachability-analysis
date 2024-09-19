@@ -15,7 +15,7 @@ from matplotlib import pyplot as plt
 class MeshObj:
     def __init__(self, adf_num=None, body_index=None, stl_num=None):
         yaml_list = ['reachability_config.yaml']
-        stl_list = ['Complete_remeshed_20_dec.STL', 'target_points.STL']
+        stl_list = ['Complete_remeshed_20_dec.STL', 'target_points.STL', 'RCM_targets.STL']
 
         if adf_num:
             self.adf_str = yaml_list[adf_num]

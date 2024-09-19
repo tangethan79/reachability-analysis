@@ -1,6 +1,7 @@
 bodies:
 - BODY Complete_remeshed_20_dec
 - BODY target_points
+- BODY RCM_targets
 joints: []
 high resolution path: ..\3mm_mesh/high_res/
 low resolution path: ..\3mm_mesh/low_res/
@@ -84,6 +85,49 @@ BODY target_points:
     orientation:
       r: 0.0
       p: -0.24435
+      y: 0.0
+  inertial offset:
+    position:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+    orientation:
+      r: 0
+      p: 0
+      y: 0
+  passive: false
+  color: random
+  publish children names: false
+  publish joint names: false
+  publish joint positions: false
+  friction:
+    rolling: 0.0
+    static: 0.5
+  restitution: 0.1
+  damping:
+    angular: 0.1
+    linear: 0.04
+  visible: true
+  collision groups: []
+BODY RCM_targets:
+  name: RCM_targets
+  mesh: RCM_targets.STL
+  collision mesh type: CONVEX_HULL
+  mass: 0.0
+  inertia:
+    ix: 0.0
+    iy: 0.0
+    iz: 0.0
+  collision margin: 0.001
+  scale: 1.0
+  location:
+    position:
+      x: 0.28628
+      y: -0.12541
+      z: 1.3
+    orientation:
+      r: 0.0
+      p: -0.0
       y: 0.0
   inertial offset:
     position:
