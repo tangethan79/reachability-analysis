@@ -73,7 +73,7 @@ if __name__ == '__main__':
     list_heatmaps = []
 
 
-    with tqdm(total=xyz.shape[1]* len(targets.points)) as pbar:
+    with tqdm(total=xyz.shape[0]* len(targets.points)) as pbar:
         for rcm_pos in xyz:
 
             ratios = np.empty(len(targets.points))
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     list_heatmaps_serializable = convert_np_to_list(list_heatmaps)
 
     # Save to JSON file
-    json_file_path = "list_heatmaps_results_sept19.json"
+    json_file_path = "list_heatmaps_results_sept18.json"
     with open(json_file_path, "w") as json_file:
         json.dump(list_heatmaps_serializable, json_file, indent=4)
 
@@ -123,8 +123,9 @@ if __name__ == '__main__':
 
     plt.show()
 
+
     """
-    rcm_pos = np.array([1,0,2])
+    rcm_pos = np.array([0.286,-0.125, 2.25])
     transform[0:3, 3] = rcm_pos.T
 
     ratios = np.empty(len(targets.points))
@@ -144,11 +145,12 @@ if __name__ == '__main__':
             ratios[i] = col_free_accum
             pbar.update(1)
 
+    """
 
     targets.plot_mesh(ax,scatter_color=True,colors=ratios)
     print(ratios)
 
     plt.show()
-    """
+
     # now need to call psm.linear_inteprolation(joints), build and prep mesh, and query tree
     # threshold query points based on radius of each region
